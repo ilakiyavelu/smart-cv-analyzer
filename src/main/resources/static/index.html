@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart CV Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .badge-eligible { background-color: #198754; color: white; }
+        .badge-partial { background-color: #ffc107; color: black; }
+        .badge-ineligible { background-color: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="fw-bold text-primary">📄 Smart CV Analyzer</h1>
+        <p class="text-muted">Automated Resume Screening & Skill Matching Engine</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- Upload Form -->
+        <div class="col-md-5">
+            <div class="card p-4">
+                <h4 class="mb-3">Upload Candidate Resume</h4>
+                <form id="uploadForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Select Resume File (.txt)</label>
+                        <input type="file" id="cvFile" class="form-control" required accept=".txt">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Required Job Skills (Comma separated)</label>
+                        <input type="text" id="skillsInput" class="form-control" placeholder="e.g. Java, Spring Boot, SQL, Docker" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold" id="submitBtn">
+                        Analyze CV
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Result Section -->
+        <div class="col-md-7">
+            <div class="card p-4">
+                <h4 class="mb-3">Analysis Dashboard</h4>
+                <div id="loading" class="text-center py-4 d-none">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Analyzing CV against required skills...</p>
+                </div>
+                
+                <div id="resultContainer" class="d-none">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="m-0" id="fileNameDisplay">resume.txt</h5>
+                        <span id="statusBadge" class="badge px-3 py-2 fs-6">ELIGIBLE</span>
+                    </div>
+
+                    <div class="progress mb-3" style="height: 22px;">
+                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated fw-bold" style="width: 0%;">0%</div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle">
+                            <tbody>
+                                <tr>
+                                    <th class="bg-light" style="width: 35%;">Extracted Email</th>
+                                    <td id="emailDisplay">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Extracted Phone</th>
+                                    <td id="phoneDisplay">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Matched Skills</th>
+                                    <td id="matchedSkillsDisplay" class="text-success fw-bold">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">Missing Skills</th>
+                                    <td id="missingSkillsDisplay" class="text-danger fw-bold">-</td>
+                                </tr>
+                                <tr>
+                                    <th class="bg-light">HR Remarks</th>
+                                    <td id="remarksDisplay" class="fst-italic">-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="placeholderText" class="text-center py-5 text-muted">
+                    Upload a file on the left to view the candidate evaluation report.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const fileInput = document.getElementById('cvFile').files[0];
+        const skillsInput = document.getElementById('skillsInput').value;
+
+        if (!fileInput || !skillsInput) return;
+
+        const formData = new FormData();
+        formData.append('file', fileInput);
+        formData.append('skills', skillsInput);
+
+        // UI toggles
+        document.getElementById('loading').classList.remove('d-none');
+        document.getElementById('resultContainer').classList.add('d-none');
+        document.getElementById('placeholderText').classList.add('d-none');
+
+        try {
+            const response = await fetch('/api/cv/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            // Populate Data
+            document.getElementById('fileNameDisplay').textContent = data.fileName;
+            document.getElementById('emailDisplay').textContent = data.extractedEmail || 'Not Found';
+            document.getElementById('phoneDisplay').textContent = data.extractedPhone || 'Not Found';
+            document.getElementById('matchedSkillsDisplay').textContent = data.matchedSkills || 'None';
+            document.getElementById('missingSkillsDisplay').textContent = data.missingSkills || 'None';
+            document.getElementById('remarksDisplay').textContent = data.remarks || '-';
+
+            // Score & Progress Bar
+            const score = data.score || 0;
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = score + '%';
+            progressBar.textContent = score + '% Match Score';
+
+            // Eligibility Badge Styling
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'badge px-3 py-2 fs-6';
+            if (data.eligibilityStatus === 'ELIGIBLE') {
+                badge.classList.add('badge-eligible');
+                progressBar.className = 'progress-bar bg-success fw-bold';
+            } else if (data.eligibilityStatus === 'PARTIALLY ELIGIBLE') {
+                badge.classList.add('badge-partial');
+                progressBar.className = 'progress-bar bg-warning text-dark fw-bold';
+            } else {
+                badge.classList.add('badge-ineligible');
+                progressBar.className = 'progress-bar bg-danger fw-bold';
+            }
+            badge.textContent = data.eligibilityStatus || 'N/A';
+
+            document.getElementById('resultContainer').classList.remove('d-none');
+        } catch (error) {
+            alert('Error processing request: ' + error.message);
+        } finally {
+            document.getElementById('loading').classList.add('d-none');
+        }
+    });
+</script>
+</body>
+</html>

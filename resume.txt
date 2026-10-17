@@ -1,0 +1,6 @@
+Rajesh Kumar
+Email: rajesh.developer@gmail.com
+Phone: +91-9876543210
+
+SKILLS:
+Java, Spring Boot, Microservices, SQL, MySQL, Git, Maven
